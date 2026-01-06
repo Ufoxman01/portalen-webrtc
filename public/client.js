@@ -10,12 +10,16 @@ const roomInput = document.getElementById("room");
 const joinBtn = document.getElementById("join");
 const status = document.getElementById("status");
 
+socket.on("connect", () => {
+  status.textContent = "🟢 Socket ansluten";
+});
+
 joinBtn.onclick = () => {
   const room = roomInput.value.trim();
 
   if (!room) {
     status.textContent = "❌ Ange ett rumnamn";
-    return;
+    return; // ← NU ligger return KORREKT
   }
 
   socket.emit("join", room);
@@ -24,10 +28,6 @@ joinBtn.onclick = () => {
 
 socket.on("joined", (room) => {
   status.textContent = `✅ Du är nu i rum: ${room}`;
-});
-
-socket.on("connect", () => {
-  status.textContent = "🟢 Socket ansluten";
 });
 
   pc.ontrack = (e) => {
