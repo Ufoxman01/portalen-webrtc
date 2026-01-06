@@ -14,11 +14,10 @@ io.on("connection", (socket) => {
   socket.on("join", (room) => {
     socket.join(room);
 
-    // Skicka lista på peers till den som just anslöt
-    const clients = Array.from(io.sockets.adapter.rooms.get(room) || []);
-    socket.emit("peers", clients.filter(id => id !== socket.id));
+    const roomSet = io.sockets.adapter.rooms.get(room) || new Set();
+    const peers = [...roomSet].filter((id) => id !== socket.id);
 
-    // Tala om för andra att en ny peer kom in
+    socket.emit("peers", peers);
     socket.to(room).emit("peer-joined", socket.id);
   });
 
@@ -33,9 +32,13 @@ io.on("connection", (socket) => {
   socket.on("ice", ({ to, candidate }) => {
     io.to(to).emit("ice", { from: socket.id, candidate });
   });
+
+  socket.on("disconnect", () => {
+    console.log("Frånkopplad:", socket.id);
+    socket.rooms.forEach((room) => socket.to(room).emit("peer-left", socket.id));
+  });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () =>
-  console.log("Portalen WebRTC kör på port", PORT)
-);
+server.listen(PORT, () => console.log("Server kör på port", PORT));
+
