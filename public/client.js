@@ -1,3 +1,9 @@
+let room = null;
+
+document.getElementById("join").onclick = () => {
+  room = document.getElementById("room").value || "portalen";
+  document.getElementById("start").disabled = false;
+};
 const socket = io();
 const room = "portalen";
 
