@@ -1,10 +1,9 @@
 const socket = io();
 const room = "portalen";
 
+const audio = document.getElementById("remote");
 let pc;
 let localStream;
-
-const audio = document.getElementById("remote");
 
 function createPeer() {
   return new RTCPeerConnection({
@@ -12,22 +11,13 @@ function createPeer() {
   });
 }
 
-document.getElementById("start").onclick = async () => {
-  localStream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: false
-  });
-
+async function startPeer(targetId, isInitiator) {
   pc = createPeer();
-
-  localStream.getTracks().forEach(track =>
-    pc.addTrack(track, localStream)
-  );
 
   pc.onicecandidate = e => {
     if (e.candidate) {
       socket.emit("ice", {
-        to: room,
+        to: targetId,
         candidate: e.candidate
       });
     }
@@ -37,17 +27,52 @@ document.getElementById("start").onclick = async () => {
     audio.srcObject = e.streams[0];
   };
 
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
+  if (!localStream) {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false
+    });
+  }
 
-  socket.emit("offer", {
-    to: room,
-    sdp: offer
+  localStream.getTracks().forEach(track =>
+    pc.addTrack(track, localStream)
+  );
+
+  if (isInitiator) {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+
+    socket.emit("offer", {
+      to: targetId,
+      sdp: offer
+    });
+  }
+}
+
+// Starta mikrofon manuellt
+document.getElementById("start").onclick = async () => {
+  localStream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: false
   });
 };
 
+// När vi går in i rummet
 socket.emit("join", room);
 
+// Får lista på befintliga peers
+socket.on("peers", (peers) => {
+  peers.forEach(peerId => {
+    startPeer(peerId, true);
+  });
+});
+
+// Någon ny anslöt
+socket.on("peer-joined", (peerId) => {
+  startPeer(peerId, false);
+});
+
+// Ta emot offer
 socket.on("offer", async ({ from, sdp }) => {
   pc = createPeer();
 
@@ -64,8 +89,18 @@ socket.on("offer", async ({ from, sdp }) => {
     audio.srcObject = e.streams[0];
   };
 
-  await pc.setRemoteDescription(sdp);
+  if (!localStream) {
+    localStream = await navigator.mediaDevices.getUserMedia({
+      audio: true,
+      video: false
+    });
+  }
 
+  localStream.getTracks().forEach(track =>
+    pc.addTrack(track, localStream)
+  );
+
+  await pc.setRemoteDescription(sdp);
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
 
@@ -75,10 +110,12 @@ socket.on("offer", async ({ from, sdp }) => {
   });
 });
 
+// Ta emot answer
 socket.on("answer", async ({ sdp }) => {
   await pc.setRemoteDescription(sdp);
 });
 
+// ICE
 socket.on("ice", async ({ candidate }) => {
   if (candidate) {
     await pc.addIceCandidate(candidate);
