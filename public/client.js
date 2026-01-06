@@ -8,12 +8,50 @@ const audio = document.getElementById("audio");
 
 let room = null;
 let localStream = null;
-const peers = new Map(); // peerId → RTCPeerConnection
+const peers = new Map(); // peerId -> RTCPeerConnection
 
-// ================= SOCKET =================
+// ============ WEBRTC ============
+function createPeer(peerId) {
+  const pc = new RTCPeerConnection({
+    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
+  });
 
+  pc.onicecandidate = e => {
+    if (e.candidate) {
+      socket.emit("ice", { to: peerId, candidate: e.candidate });
+    }
+  };
+
+  pc.ontrack = e => {
+    console.log("🎧 ontrack från", peerId);
+    audio.srcObject = e.streams[0];
+  };
+
+  localStream.getTracks().forEach(track =>
+    pc.addTrack(track, localStream)
+  );
+
+  peers.set(peerId, pc);
+  return pc;
+}
+
+// ============ MIC ============
+startBtn.onclick = async () => {
+  localStream = await navigator.mediaDevices.getUserMedia({
+    audio: true,
+    video: false
+  });
+
+  startBtn.disabled = true;
+  startBtn.textContent = "🎙️ Mikrofon igång";
+  joinBtn.disabled = false;
+
+  status.textContent = "Redo att joina rum";
+};
+
+// ============ SOCKET ============
 socket.on("connect", () => {
-  status.textContent = "🟢 Socket ansluten";
+  status.textContent = "🟢 Socket ansluten – starta mikrofon";
 });
 
 joinBtn.onclick = () => {
@@ -27,38 +65,16 @@ joinBtn.onclick = () => {
 
 socket.on("joined", (r) => {
   status.textContent = `✅ I rum: ${r}`;
-  startBtn.disabled = false;
 });
 
 socket.on("peers", (list) => {
+  console.log("👥 Befintliga peers:", list);
   list.forEach(peerId => callPeer(peerId));
 });
 
 socket.on("peer-joined", (peerId) => {
-  // Väntar på offer från ny peer
+  console.log("➕ Ny peer:", peerId);
 });
-
-// ================= WEBRTC =================
-
-function createPeer(peerId) {
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-  });
-
-  pc.onicecandidate = e => {
-    if (e.candidate) {
-      socket.emit("ice", { to: peerId, candidate: e.candidate });
-    }
-  };
-
-  pc.ontrack = e => {
-    audio.srcObject = e.streams[0];
-  };
-
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
-  peers.set(peerId, pc);
-  return pc;
-}
 
 async function callPeer(peerId) {
   const pc = createPeer(peerId);
@@ -68,6 +84,7 @@ async function callPeer(peerId) {
 }
 
 socket.on("offer", async ({ from, sdp }) => {
+  console.log("📞 Offer från", from);
   const pc = createPeer(from);
   await pc.setRemoteDescription(sdp);
   const answer = await pc.createAnswer();
@@ -76,6 +93,7 @@ socket.on("offer", async ({ from, sdp }) => {
 });
 
 socket.on("answer", async ({ from, sdp }) => {
+  console.log("📨 Answer från", from);
   await peers.get(from).setRemoteDescription(sdp);
 });
 
@@ -84,15 +102,3 @@ socket.on("ice", async ({ from, candidate }) => {
     await peers.get(from).addIceCandidate(candidate);
   } catch {}
 });
-
-// ================= MIC =================
-
-startBtn.onclick = async () => {
-  localStream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: false
-  });
-  startBtn.disabled = true;
-  startBtn.textContent = "🎙️ Mikrofon igång";
-};
-
