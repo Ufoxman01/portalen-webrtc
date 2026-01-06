@@ -5,18 +5,22 @@
   <title>Portalen – WebRTC</title>
 </head>
 <body>
-<h2>Portalen – Rumstest</h2>
 
-<input id="room" placeholder="Skriv rum (t.ex. portalen)">
+<h2>Portalen – WebRTC Test</h2>
+
+<input id="room" placeholder="Rumnamn">
 <button id="join">Joina rum</button>
 
-<p id="status">Inte ansluten</p>
+<p id="status">Ej ansluten</p>
+
+<hr>
+
+<button id="start" disabled>Starta mikrofon</button>
+<br><br>
+<audio id="audio" autoplay></audio>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="client.js"></script>
-  
-<button id="start" disabled>Starta mikrofon</button>
-<audio id="remote" autoplay></audio>
-<body>
-</html>
 
+</body>
+</html>
