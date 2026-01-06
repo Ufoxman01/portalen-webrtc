@@ -13,19 +13,25 @@ io.on("connection", (socket) => {
 
   socket.on("join", (room) => {
     socket.join(room);
+
+    // Skicka lista på peers till den som just anslöt
+    const clients = Array.from(io.sockets.adapter.rooms.get(room) || []);
+    socket.emit("peers", clients.filter(id => id !== socket.id));
+
+    // Tala om för andra att en ny peer kom in
     socket.to(room).emit("peer-joined", socket.id);
   });
 
   socket.on("offer", ({ to, sdp }) => {
-    socket.to(to).emit("offer", { from: socket.id, sdp });
+    io.to(to).emit("offer", { from: socket.id, sdp });
   });
 
   socket.on("answer", ({ to, sdp }) => {
-    socket.to(to).emit("answer", { from: socket.id, sdp });
+    io.to(to).emit("answer", { from: socket.id, sdp });
   });
 
   socket.on("ice", ({ to, candidate }) => {
-    socket.to(to).emit("ice", { from: socket.id, candidate });
+    io.to(to).emit("ice", { from: socket.id, candidate });
   });
 });
 
