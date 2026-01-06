@@ -5,26 +5,30 @@ document.getElementById("join").onclick = () => {
   document.getElementById("start").disabled = false;
 };
 const socket = io();
-const room = "portalen";
 
-const startBtn = document.getElementById("start");
-const audioEl = document.getElementById("remote");
+const roomInput = document.getElementById("room");
+const joinBtn = document.getElementById("join");
+const status = document.getElementById("status");
 
-let localStream = null;
+joinBtn.onclick = () => {
+  const room = roomInput.value.trim();
 
-// peerId -> RTCPeerConnection
-const pcs = new Map();
+  if (!room) {
+    status.textContent = "❌ Ange ett rumnamn";
+    return;
+  }
 
-function createPeer(peerId) {
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
-  });
+  socket.emit("join", room);
+  status.textContent = `⏳ Försöker joina rum: ${room}`;
+};
 
-  pc.onicecandidate = (e) => {
-    if (e.candidate) {
-      socket.emit("ice", { to: peerId, candidate: e.candidate });
-    }
-  };
+socket.on("joined", (room) => {
+  status.textContent = `✅ Du är nu i rum: ${room}`;
+});
+
+socket.on("connect", () => {
+  status.textContent = "🟢 Socket ansluten";
+});
 
   pc.ontrack = (e) => {
     // För enkel audio-radio: spela första inkommande streamen
