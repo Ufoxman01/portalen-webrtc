@@ -8,44 +8,27 @@ const io = new Server(server);
 
 app.use(express.static("public"));
 
-io.on("connection", (socket) => {
-  console.log("🟢 Ansluten:", socket.id);
+io.on("connection", socket => {
+  console.log("Ansluten:", socket.id);
 
-  socket.on("join", (room) => {
+  socket.on("join", room => {
     socket.join(room);
-    console.log(`➡ ${socket.id} joinade rum: ${room}`);
 
-    // Skicka tillbaka bekräftelse
-    socket.emit("joined", room);
-
-    // Skicka befintliga peers i rummet
-    const clients = [...(io.sockets.adapter.rooms.get(room) || [])]
+    const peers =
+      [...(io.sockets.adapter.rooms.get(room) || [])]
       .filter(id => id !== socket.id);
 
-    socket.emit("peers", clients);
+    socket.emit("peers", peers);
     socket.to(room).emit("peer-joined", socket.id);
   });
 
-  socket.on("offer", ({ to, sdp }) => {
-    io.to(to).emit("offer", { from: socket.id, sdp });
-  });
-
-  socket.on("answer", ({ to, sdp }) => {
-    io.to(to).emit("answer", { from: socket.id, sdp });
-  });
-
-  socket.on("ice", ({ to, candidate }) => {
-    io.to(to).emit("ice", { from: socket.id, candidate });
-  });
-
-  socket.on("disconnect", () => {
-    console.log("🔴 Frånkopplad:", socket.id);
-  });
+  socket.on("offer", data => io.to(data.to).emit("offer", data));
+  socket.on("answer", data => io.to(data.to).emit("answer", data));
+  socket.on("ice", data => io.to(data.to).emit("ice", data));
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log("🚀 Server kör på http://localhost:" + PORT);
-});
+server.listen(3000, () =>
+  console.log("Server på http://localhost:3000")
+);
 
 
