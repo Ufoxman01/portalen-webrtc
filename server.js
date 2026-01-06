@@ -13,12 +13,9 @@ io.on("connection", (socket) => {
 
   socket.on("join", (room) => {
     socket.join(room);
+    console.log(`➡ ${socket.id} gick med i rum: ${room}`);
 
-    const roomSet = io.sockets.adapter.rooms.get(room) || new Set();
-    const peers = [...roomSet].filter((id) => id !== socket.id);
-
-    socket.emit("peers", peers);
-    socket.to(room).emit("peer-joined", socket.id);
+    socket.emit("joined", room);
   });
 
   socket.on("offer", ({ to, sdp }) => {
