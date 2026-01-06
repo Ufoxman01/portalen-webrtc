@@ -18,9 +18,17 @@ function createPC(peerId) {
     }
   };
 
-  pc.ontrack = e => {
-    audio.srcObject = e.streams[0];
-  };
+pc.ontrack = e => {
+  console.log("🎧 Audio stream mottagen");
+  audio.srcObject = e.streams[0];
+  audio.muted = false;
+  audio.volume = 1.0;
+
+  audio.play().catch(err => {
+    console.error("❌ audio.play() blockerad:", err);
+  });
+};
+
 
   localStream.getTracks().forEach(t =>
     pc.addTrack(t, localStream)
