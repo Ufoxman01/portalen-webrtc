@@ -2,33 +2,21 @@
 <html lang="sv">
 <head>
   <meta charset="utf-8">
-  <title>Portalen – WebRTC</title>
+  <title>WebRTC Test</title>
 </head>
 <body>
 
-<h2>Portalen – WebRTC Test</h2>
+<h2>WebRTC Audio Test</h2>
 
 <input id="room" placeholder="Rumnamn">
-  
-<button id="start" disabled>Starta mikrofon</button>
-<button id="join">Joina rum</button>
-
-<p id="status">Ej ansluten</p>
-
-<hr>
+<button id="join">Joina</button>
 
 <br><br>
+
+<button id="start">Starta mikrofon</button>
 <audio id="audio" autoplay></audio>
-  localStream = await navigator.mediaDevices.getUserMedia({
-  audio: {
-    echoCancellation: false,
-    noiseSuppression: false,
-    autoGainControl: false
-  }
-});
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="client.js"></script>
-
 </body>
 </html>
