@@ -19,6 +19,13 @@
 
 <br><br>
 <audio id="audio" autoplay></audio>
+  localStream = await navigator.mediaDevices.getUserMedia({
+  audio: {
+    echoCancellation: false,
+    noiseSuppression: false,
+    autoGainControl: false
+  }
+});
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="client.js"></script>
