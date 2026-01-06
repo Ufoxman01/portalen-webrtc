@@ -9,13 +9,21 @@ const io = new Server(server);
 app.use(express.static("public"));
 
 io.on("connection", (socket) => {
-  console.log("Ansluten:", socket.id);
+  console.log("🟢 Ansluten:", socket.id);
 
   socket.on("join", (room) => {
     socket.join(room);
-    console.log(`➡ ${socket.id} gick med i rum: ${room}`);
+    console.log(`➡ ${socket.id} joinade rum: ${room}`);
 
+    // Skicka tillbaka bekräftelse
     socket.emit("joined", room);
+
+    // Skicka befintliga peers i rummet
+    const clients = [...(io.sockets.adapter.rooms.get(room) || [])]
+      .filter(id => id !== socket.id);
+
+    socket.emit("peers", clients);
+    socket.to(room).emit("peer-joined", socket.id);
   });
 
   socket.on("offer", ({ to, sdp }) => {
@@ -31,11 +39,13 @@ io.on("connection", (socket) => {
   });
 
   socket.on("disconnect", () => {
-    console.log("Frånkopplad:", socket.id);
-    socket.rooms.forEach((room) => socket.to(room).emit("peer-left", socket.id));
+    console.log("🔴 Frånkopplad:", socket.id);
   });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log("Server kör på port", PORT));
+server.listen(PORT, () => {
+  console.log("🚀 Server kör på http://localhost:" + PORT);
+});
+
 
