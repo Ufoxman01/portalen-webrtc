@@ -1,124 +1,109 @@
 const socket = io();
 const room = "portalen";
 
-const audio = document.getElementById("remote");
-let pc;
-let localStream;
+const startBtn = document.getElementById("start");
+const audioEl = document.getElementById("remote");
 
-function createPeer() {
-  return new RTCPeerConnection({
+let localStream = null;
+
+// peerId -> RTCPeerConnection
+const pcs = new Map();
+
+function createPeer(peerId) {
+  const pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
   });
-}
 
-async function startPeer(targetId, isInitiator) {
-  pc = createPeer();
-
-  pc.onicecandidate = e => {
+  pc.onicecandidate = (e) => {
     if (e.candidate) {
-      socket.emit("ice", {
-        to: targetId,
-        candidate: e.candidate
-      });
+      socket.emit("ice", { to: peerId, candidate: e.candidate });
     }
   };
 
-  pc.ontrack = e => {
-    audio.srcObject = e.streams[0];
+  pc.ontrack = (e) => {
+    // För enkel audio-radio: spela första inkommande streamen
+    if (!audioEl.srcObject) audioEl.srcObject = e.streams[0];
   };
 
-  if (!localStream) {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: false
-    });
+  // lägg till mic om den finns
+  if (localStream) {
+    for (const track of localStream.getTracks()) {
+      pc.addTrack(track, localStream);
+    }
   }
 
-  localStream.getTracks().forEach(track =>
-    pc.addTrack(track, localStream)
-  );
+  pcs.set(peerId, pc);
+  return pc;
+}
 
-  if (isInitiator) {
+async function ensureMic() {
+  if (localStream) return localStream;
+  localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  return localStream;
+}
+
+startBtn.onclick = async () => {
+  await ensureMic();
+};
+
+socket.emit("join", room);
+
+// När du får befintliga peers: ring upp dem (du är initiator)
+socket.on("peers", async (peers) => {
+  // om du vill: auto-starta mic vid första test
+  // await ensureMic();
+
+  for (const peerId of peers) {
+    const pc = createPeer(peerId);
+
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
 
-    socket.emit("offer", {
-      to: targetId,
-      sdp: offer
-    });
+    socket.emit("offer", { to: peerId, sdp: offer });
   }
-}
-
-// Starta mikrofon manuellt
-document.getElementById("start").onclick = async () => {
-  localStream = await navigator.mediaDevices.getUserMedia({
-    audio: true,
-    video: false
-  });
-};
-
-// När vi går in i rummet
-socket.emit("join", room);
-
-// Får lista på befintliga peers
-socket.on("peers", (peers) => {
-  peers.forEach(peerId => {
-    startPeer(peerId, true);
-  });
 });
 
-// Någon ny anslöt
+// När en ny peer ansluter: vänta på offer från den (du är inte initiator här)
 socket.on("peer-joined", (peerId) => {
-  startPeer(peerId, false);
+  // Vi skapar pc så vi kan ta emot offer/ice
+  if (!pcs.has(peerId)) createPeer(peerId);
 });
 
-// Ta emot offer
 socket.on("offer", async ({ from, sdp }) => {
-  pc = createPeer();
+  // Se till att vi har mic om vi ska kunna svara med audio tillbaka
+  // Om du vill att lyssnare INTE ska prata tillbaka senare, tar vi bort detta i Steg 2.
+  await ensureMic();
 
-  pc.onicecandidate = e => {
-    if (e.candidate) {
-      socket.emit("ice", {
-        to: from,
-        candidate: e.candidate
-      });
-    }
-  };
-
-  pc.ontrack = e => {
-    audio.srcObject = e.streams[0];
-  };
-
-  if (!localStream) {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: false
-    });
-  }
-
-  localStream.getTracks().forEach(track =>
-    pc.addTrack(track, localStream)
-  );
+  const pc = pcs.get(from) || createPeer(from);
 
   await pc.setRemoteDescription(sdp);
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
 
-  socket.emit("answer", {
-    to: from,
-    sdp: answer
-  });
+  socket.emit("answer", { to: from, sdp: answer });
 });
 
-// Ta emot answer
-socket.on("answer", async ({ sdp }) => {
+socket.on("answer", async ({ from, sdp }) => {
+  const pc = pcs.get(from);
+  if (!pc) return;
   await pc.setRemoteDescription(sdp);
 });
 
-// ICE
-socket.on("ice", async ({ candidate }) => {
-  if (candidate) {
+socket.on("ice", async ({ from, candidate }) => {
+  const pc = pcs.get(from);
+  if (!pc) return;
+  try {
     await pc.addIceCandidate(candidate);
-  }
+  } catch {}
 });
+
+socket.on("peer-left", (peerId) => {
+  const pc = pcs.get(peerId);
+  if (pc) pc.close();
+  pcs.delete(peerId);
+
+  // om den som spelades försvann
+  // (valfritt) audioEl.srcObject = null;
+});
+
 
